@@ -27,19 +27,26 @@ def main():
                     result_image, markup = generate_page(current_image, peer_id, photos)
                     assert isinstance(result_image, PhotoSize)
                     if do_submit:
-                        bot.answer_callback_query(update.callback_query.id, text="Sending...")
-                        result = bot.send_photo(chat_id=update.callback_query.message.chat.id, photo=result_image.file_id)
+                        bot.answer_callback_query(update.callback_query.id, text="Sending photo...")
+                        bot.send_message(update.message.chat.id, "отправьте фото пожалуйста")
+                        
+                        # result = bot.send_photo(chat_id=update.callback_query.message.chat.id, photo=result_image.file_id)
+                        
                     else:
-                        bot.answer_callback_query(update.callback_query.id, text=None)
-                        result = bot.edit_message_text(
-                            "Profile pic {num}\n{w}x{h}, {size}B".format(
-                                num=current_image, w=result_image.width, h=result_image.height, size=result_image.file_size
-                            ),
-                            chat_id=update.callback_query.message.chat.id,
-                            message_id=update.callback_query.message.message_id,
-                            disable_web_page_preview=False,
-                            reply_markup=markup
-                        )
+                        bot.answer_callback_query(update.callback_query.id, text="Sending query...")
+                        bot.send_message(update.message.chat.id, "ваш вопрос будет отпарвлен нашему менеджеру")
+                        
+                        # result = bot.edit_message_text(
+                        #     "Profile pic {num}\n{w}x{h}, {size}B".format(
+                        #         num=current_image, w=result_image.width, h=result_image.height, size=result_image.file_size
+                        #     ),
+                        #     chat_id=update.callback_query.message.chat.id,
+                        #     message_id=update.callback_query.message.message_id,
+                        #     disable_web_page_preview=False,
+                        #     reply_markup=markup
+                        # )
+                        
+                        
                     # end if
                     print(result)
                 # end if
@@ -67,25 +74,25 @@ def main():
                         bot.send_message(update.message.chat.id, "отправьте фото пожалуйста")
                     elif command == "задать вопрос" or command == "/2":
                         bot.send_message(update.message.chat.id, "ваш вопрос будет отпарвлен нашему менеджеру")
+                    elif  command == "/unkey":
+                        hide_keyboard(update.message.chat.id)
                     elif command == "/start":
                         do_keyboard(update.message.chat.id)
-                    if command == "/unkey":
-                        hide_keyboard(update.message.chat.id)
-                    # end if
+                
 
 
-                buttons = [[],[]]  # 2 rows
-                buttons[0].append(InlineKeyboardButton(
-                    "отправить фото", callback_data="{peer_id};{curr_pos};True".format(peer_id=peer_id, curr_pos=current_image)
-                    # "/1 отправить фото", callback_data="/1 отправить_фото"
-                ))
-                buttons[1].append(InlineKeyboardButton(
-                    "задать вопрос", callback_data="{peer_id};{curr_pos};False".format(peer_id=peer_id, curr_pos=current_image)
-                    # "/2 задать вопрос", callback_data="/2 задать_вопрос"
-                ))
-                markup = InlineKeyboardMarkup(buttons)
-    
-                print(bot.send_msg(update.message.chat.id, "что вам необходимо сделать?", reply_markup=markup))
+                        buttons = [[],[]]  # 2 rows
+                        buttons[0].append(InlineKeyboardButton(
+                            "отправить фото", callback_data="{peer_id};{curr_pos};True".format(peer_id=peer_id, curr_pos=current_image)
+                            # "/1 отправить фото", callback_data="/1 отправить_фото"
+                        ))
+                        buttons[1].append(InlineKeyboardButton(
+                            "задать вопрос", callback_data="{peer_id};{curr_pos};False".format(peer_id=peer_id, curr_pos=current_image)
+                            # "/2 задать вопрос", callback_data="/2 задать_вопрос"
+                        ))
+                        markup = InlineKeyboardMarkup(buttons)
+            
+                        print(bot.send_msg(update.message.chat.id, "что вам необходимо сделать?", reply_markup=markup))
                 
 
 
