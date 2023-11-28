@@ -1,13 +1,162 @@
 import json
-
+import psycopg2
 from pytgbot import Bot
 from pytgbot.api_types import as_array
 from pytgbot.api_types.sendable.reply_markup import ForceReply, ReplyKeyboardRemove, ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardButton, InlineKeyboardMarkup
 from pytgbot.api_types.receivable.updates import Message
 from pytgbot.api_types.receivable.media import PhotoSize
-from some import API_KEY
+from some import API_KEY, pgdb, pguser, pgpswd, pghost, pgport, pgschema
+
+import timeit
+import uuid
+
+
+
 photo_cache = {}  # stores the images.
 bot = Bot(API_KEY)
+
+
+
+
+
+           
+def selByPhoneFromBase(name):
+    limit = 1
+    try:
+        for x in range(0, 9999):
+            try:
+                    conpg = psycopg2.connect(database=pgdb, user=pguser, password=pgpswd,
+                            host=pghost,port=pgport) # , options=f'-c search_path={pgschema}')
+            except Exception as e:
+                print('pgbouncer exception 1 - ',e)
+                time.sleep(0.2)
+                pass
+            finally:
+                break
+        
+        if 'conpg' not in locals():
+            return False
+
+        if conpg:
+         with conpg:
+             with conpg.cursor() as curpg:
+                sql = " Set search_path =%(pgdb)s "
+                params={"pgdb":pgdb}
+                curpg.execute(sql,params)
+                conpg.commit()
+
+        if conpg:
+         with conpg:
+             with conpg.cursor() as curpg:
+                    limit = 7
+                    sql = " select fio as str from objects where  \"Phone\" = '"+str(name)+"'  limit "+str(limit)  # coock_str is not null and
+                    # params={"name":name}
+                    # curpg.execute(sql,params)
+                    curpg.execute(sql)
+                    res1 = curpg.fetchall()
+                    return res1
+        return False
+    except psycopg2.DatabaseError as e:
+        print('Error %s' % e)
+
+
+           
+def selByPinFromBase(name,tagnick):
+    name = name.strip()
+    limit = 1
+    try:
+        for x in range(0, 9999):
+            try:
+                    conpg = psycopg2.connect(database=pgdb, user=pguser, password=pgpswd,
+                            host=pghost,port=pgport) # , options=f'-c search_path={pgschema}')
+            except Exception as e:
+                print('pgbouncer exception 1 - ',e)
+                time.sleep(0.2)
+                pass
+            finally:
+                break
+        
+        if 'conpg' not in locals():
+            return False
+
+        if conpg:
+         with conpg:
+             with conpg.cursor() as curpg:
+                sql = " Set search_path =%(pgdb)s "
+                params={"pgdb":pgdb}
+                curpg.execute(sql,params)
+                conpg.commit()
+
+        if conpg:
+         with conpg:
+             with conpg.cursor() as curpg:
+                    limit = 7
+                    sql = " select fio as str from objects where  \"PIN\" = '"+str(name)+"' and  \"chat_id\" is null and  \"PIN\" <> '' and  \"PIN\" is not null  limit "+str(limit)  # coock_str is not null and
+                    # params={"name":name}
+                    # curpg.execute(sql,params)
+                    curpg.execute(sql)
+                    res1 = curpg.fetchone()
+                    
+                    
+                    # sql = " update objects set \"chat_id\" = %(tagnick)s , \"PIN\" = null where  \"PIN\" = '"+str(name)+"' and  \"chat_id\" is null and  \"PIN\" <> '' and  \"PIN\" is not null  "
+                    # params={"name":name,"tagnick":tagnick}
+                    # curpg.execute(sql,params)
+                    # conpg.commit()
+                    
+                    # sql = " update targets set \"status\" = %(tagnick)s where   \"PIN\" = '"+str(name)+"' and  \"chat_id\" is null and  \"PIN\" <> '' and  \"PIN\" is not null  "
+                    # params={"name":name,"tagnick":tagnick}
+                    # curpg.execute(sql,params)
+                    # conpg.commit()
+                    
+                    print('fixed')
+                    
+                    return res1
+        return False
+    except psycopg2.DatabaseError as e:
+        print('Error %s' % e)
+
+
+
+           
+def selByChatIdFromBase(name):
+    limit = 1
+    try:
+        for x in range(0, 9999):
+            try:
+                    conpg = psycopg2.connect(database=pgdb, user=pguser, password=pgpswd,
+                            host=pghost,port=pgport) # , options=f'-c search_path={pgschema}')
+            except Exception as e:
+                print('pgbouncer exception 1 - ',e)
+                time.sleep(0.2)
+                pass
+            finally:
+                break
+        
+        if 'conpg' not in locals():
+            return False
+
+        if conpg:
+         with conpg:
+             with conpg.cursor() as curpg:
+                sql = " Set search_path =%(pgdb)s "
+                params={"pgdb":pgdb}
+                curpg.execute(sql,params)
+                conpg.commit()
+
+        if conpg:
+         with conpg:
+             with conpg.cursor() as curpg:
+                    limit = 7
+                    sql = " select fio as str from objects where  \"chat_id\" = '"+str(name)+"'  limit "+str(limit)  # coock_str is not null and
+                    # params={"name":name}
+                    # curpg.execute(sql,params)
+                    curpg.execute(sql)
+                    res1 = curpg.fetchall()
+                    return res1
+        return False
+    except psycopg2.DatabaseError as e:
+        print('Error %s' % e)
+
 
 def main():
     my_info=bot.get_me()
@@ -17,7 +166,23 @@ def main():
         try:
             for update in bot.get_updates(limit=1, offset=last_update_id+1):
                 last_update_id = update.update_id
+                origin, peer_id = get_sender_infos(update.message)
+                current_image = 0
+                photos = cache_peer_images(peer_id, force=True)
+                        
                 print(update)
+                print('update update.message.chat.id', update.message.chat.id)
+                fio = selByChatIdFromBase(update.message.chat.id)
+                if not fio:
+                    #проверить телефон или пин
+                    if update.message.text:
+                        fio = selByPinFromBase(update.message.text,update.message.chat.id)
+                        if fio:
+                            bot.send_message(update.message.chat.id, "добро пожаловать в систему для получения бонусов Дом Отель, "+str(fio[0]))
+                        else:
+                            #отказать    
+                            bot.send_message(update.message.chat.id, "ваш аккаунт не зарегиcтрирован в нашей системе, получите регистрационный код у нашего менеджера")
+                            continue
                 
                 if update.callback_query:
                     # callback_query.message is the original message the bot sent
@@ -53,47 +218,45 @@ def main():
                     # end if
                     
                 if not update.message or not update.message.entities:
-                    continue
-                
-                
-                for entity in update.message.entities:
-                    
-                    origin, peer_id = get_sender_infos(update.message)
-                    current_image = 0
-                    photos = cache_peer_images(peer_id, force=True)
-                    
-                    # MessageEntity
-                    print('-------')
-                    print('entity.type',entity.type)
-                    print('-------')
-                    
-                    
-                    if entity.type == "bot_command":
-                        command = update.message.text[entity.offset:entity.offset+entity.length]
-                        print('command:',command)
-                        if command == "отправить фото" or command == "/1":
-                            bot.send_message(update.message.chat.id, "отправьте фото пожалуйста")
-                        elif command == "задать вопрос" or command == "/2":
-                            bot.send_message(update.message.chat.id, "ваш вопрос будет отпарвлен нашему менеджеру")
-                        elif  command == "/unkey":
-                            hide_keyboard(update.message.chat.id)
-                        elif command == "/start":
-                            do_keyboard(update.message.chat.id)
-                    
+                    pass
+                else:
+                    for entity in update.message.entities:
+                        
+                        
+                      
+                        
+                        # MessageEntity
+                        print('-------')
+                        print('entity.type',entity.type)
+                        print('-------')
+                        
+                        
+                        if entity.type == "bot_command":
+                            command = update.message.text[entity.offset:entity.offset+entity.length]
+                            print('command:',command)
+                            if command == "отправить фото" or command == "/1":
+                                bot.send_message(update.message.chat.id, "отправьте фото пожалуйста")
+                            elif command == "задать вопрос" or command == "/2":
+                                bot.send_message(update.message.chat.id, "ваш вопрос будет отпарвлен нашему менеджеру")
+                            elif  command == "/unkey":
+                                hide_keyboard(update.message.chat.id)
+                            elif command == "/start":
+                                do_keyboard(update.message.chat.id)
+                        
 
 
-                            buttons = [[],[]]  # 2 rows
-                            buttons[0].append(InlineKeyboardButton(
-                                "отправить фото", callback_data="{peer_id};{curr_pos};True".format(peer_id=peer_id, curr_pos=current_image)
-                                # "/1 отправить фото", callback_data="/1 отправить_фото"
-                            ))
-                            buttons[1].append(InlineKeyboardButton(
-                                "задать вопрос", callback_data="{peer_id};{curr_pos};False".format(peer_id=peer_id, curr_pos=current_image)
-                                # "/2 задать вопрос", callback_data="/2 задать_вопрос"
-                            ))
-                            markup = InlineKeyboardMarkup(buttons)
-                
-                            print(bot.send_msg(update.message.chat.id, "что вам необходимо сделать?", reply_markup=markup))
+                buttons = [[],[]]  # 2 rows
+                buttons[0].append(InlineKeyboardButton(
+                    "отправить фото", callback_data="{peer_id};{curr_pos};True".format(peer_id=peer_id, curr_pos=current_image)
+                    # "/1 отправить фото", callback_data="/1 отправить_фото"
+                ))
+                buttons[1].append(InlineKeyboardButton(
+                    "задать вопрос", callback_data="{peer_id};{curr_pos};False".format(peer_id=peer_id, curr_pos=current_image)
+                    # "/2 задать вопрос", callback_data="/2 задать_вопрос"
+                ))
+                markup = InlineKeyboardMarkup(buttons)
+    
+                print(bot.send_msg(update.message.chat.id, "что вам необходимо сделать?", reply_markup=markup))
                     
 
 
@@ -107,8 +270,8 @@ def main():
                     #         hide_keyboard(update.message.chat.id)
                     #     # end if
 
-        except TgApiException:
-            logger.exception()
+        except KeyError as e:
+            print(' over KeyError  ' + str(e))
 
             # end for
         # end for update
