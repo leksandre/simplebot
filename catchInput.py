@@ -5,8 +5,8 @@ from pytgbot.api_types import as_array
 from pytgbot.api_types.sendable.reply_markup import ForceReply, ReplyKeyboardRemove, ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardButton, InlineKeyboardMarkup
 from pytgbot.api_types.receivable.updates import Message
 from pytgbot.api_types.receivable.media import PhotoSize
-from some import API_KEY, pgdb, pguser, pgpswd, pghost, pgport, pgschema
-
+from some import API_KEY, pgdb, pguser, pgpswd, pghost, pgport, pgschema, url_e, url_c, log_e, pass_e
+import requests
 import timeit
 import uuid
 
@@ -18,8 +18,8 @@ bot = Bot(API_KEY)
 
 
 
+AppId = 14
 
-           
 def selByPhoneFromBase(name):
     limit = 1
     try:
@@ -97,16 +97,16 @@ def selByPinFromBase(name,tagnick):
                     curpg.execute(sql)
                     res1 = curpg.fetchone()
                     
-                    
-                    # sql = " update objects set \"chat_id\" = %(tagnick)s , \"PIN\" = null where  \"PIN\" = '"+str(name)+"' and  \"chat_id\" is null and  \"PIN\" <> '' and  \"PIN\" is not null  "
-                    # params={"name":name,"tagnick":tagnick}
-                    # curpg.execute(sql,params)
-                    # conpg.commit()
-                    
-                    # sql = " update targets set \"status\" = %(tagnick)s where   \"PIN\" = '"+str(name)+"' and  \"chat_id\" is null and  \"PIN\" <> '' and  \"PIN\" is not null  "
-                    # params={"name":name,"tagnick":tagnick}
-                    # curpg.execute(sql,params)
-                    # conpg.commit()
+                    if True:             
+                        sql = " update objects set \"chat_id\" = %(tagnick)s , \"PIN\" = null where  \"PIN\" = '"+str(name)+"' and  \"chat_id\" is null and  \"PIN\" <> '' and  \"PIN\" is not null  "
+                        params={"name":name,"tagnick":tagnick}
+                        curpg.execute(sql,params)
+                        conpg.commit()
+                        
+                        # sql = " update targets set \"status\" = %(tagnick)s where   \"PIN\" = '"+str(name)+"' and  \"chat_id\" is null and  \"PIN\" <> '' and  \"PIN\" is not null  "
+                        # params={"name":name,"tagnick":tagnick}
+                        # curpg.execute(sql,params)
+                        # conpg.commit()
                     
                     print('fixed')
                     
@@ -118,7 +118,7 @@ def selByPinFromBase(name,tagnick):
 
 
            
-def selByChatIdFromBase(name):
+def selByChatIdFromBase(name, field):
     limit = 1
     try:
         for x in range(0, 9999):
@@ -146,8 +146,8 @@ def selByChatIdFromBase(name):
         if conpg:
          with conpg:
              with conpg.cursor() as curpg:
-                    limit = 7
-                    sql = " select fio as str from objects where  \"chat_id\" = '"+str(name)+"'  limit "+str(limit)  # coock_str is not null and
+                    limit = 1
+                    sql = " select '"+str(field)+"' as str from objects where  \"Enabled\" = 1 and \"chat_id\" = '"+str(name)+"'  limit "+str(limit)  # coock_str is not null and
                     # params={"name":name}
                     # curpg.execute(sql,params)
                     curpg.execute(sql)
@@ -166,24 +166,35 @@ def main():
         try:
             for update in bot.get_updates(limit=1, offset=last_update_id+1):
                 last_update_id = update.update_id
-                origin, peer_id = get_sender_infos(update.message)
-                current_image = 0
-                photos = cache_peer_images(peer_id, force=True)
-                        
+                ObjectId = 0
+                #get chat and text
+                chat_id = False
+                text_message = False
                 print(update)
-                print('update update.message.chat.id', update.message.chat.id)
-                fio = selByChatIdFromBase(update.message.chat.id)
+                if(update.callback_query)and(update.callback_query.message)and(update.callback_query.message.chat)and(update.callback_query.message.chat.id):
+                    print('update.callback_query.message.chat.id', update.callback_query.message.chat.id)
+                    text_message = update.callback_query.message.text
+                    chat_id = update.callback_query.message.chat.id
+                if(update.message)and(update.message.chat)and(update.message.chat.id):
+                    print('update update.message.chat.id', update.message.chat.id)
+                    text_message = update.message.text
+                    chat_id = update.message.chat.id
+                    
+                #check user
+                fio = selByChatIdFromBase(chat_id, 'fio')
                 if not fio:
                     #проверить телефон или пин
-                    if update.message.text:
-                        fio = selByPinFromBase(update.message.text,update.message.chat.id)
+                    if text_message:
+                        fio = selByPinFromBase(text_message,chat_id)
                         if fio:
-                            bot.send_message(update.message.chat.id, "добро пожаловать в систему для получения бонусов Дом Отель, "+str(fio[0]))
+                            bot.send_message(chat_id, "добро пожаловать в систему для получения бонусов Дом Отель, "+str(fio[0]))
+                            ObjectId = selByChatIdFromBase(chat_id, 'id')
                         else:
                             #отказать    
-                            bot.send_message(update.message.chat.id, "ваш аккаунт не зарегиcтрирован в нашей системе, получите регистрационный код у нашего менеджера")
+                            bot.send_message(chat_id, "ваш аккаунт не зарегиcтрирован в нашей системе, получите регистрационный код у нашего менеджера")
                             continue
                 
+                #if it inline button reaction 
                 if update.callback_query:
                     # callback_query.message is the original message the bot sent
                         peer_id, current_image, do_submit = update.callback_query.data.split(";")
@@ -194,19 +205,19 @@ def main():
                         assert isinstance(result_image, PhotoSize)
                         if do_submit:
                             bot.answer_callback_query(update.callback_query.id, text="Sending photo...")
-                            result = bot.send_message(update.callback_query.message.chat.id, "отправьте фото пожалуйста")
+                            result = bot.send_message(chat_id, "отправьте ваше фото пожалуйста, принимаются только фотографии сделанные в текуще месяце")
                             
-                            # result = bot.send_photo(chat_id=update.callback_query.message.chat.id, photo=result_image.file_id)
+                            # result = bot.send_photo(chat_id=chat_id, photo=result_image.file_id)
                             
                         else:
                             bot.answer_callback_query(update.callback_query.id, text="Sending query...")
-                            result = bot.send_message(update.callback_query.message.chat.id, "ваш вопрос будет отпарвлен нашему менеджеру")
+                            result = bot.send_message(chat_id, "напишите ваш вопрос, он будет передан нашему менеджеру, который свяжется с вам для разъяснения ситуации")
                             
                             # result = bot.edit_message_text(
                             #     "Profile pic {num}\n{w}x{h}, {size}B".format(
                             #         num=current_image, w=result_image.width, h=result_image.height, size=result_image.file_size
                             #     ),
-                            #     chat_id=update.callback_query.message.chat.id,
+                            #     chat_id=chat_id,
                             #     message_id=update.callback_query.message.message_id,
                             #     disable_web_page_preview=False,
                             #     reply_markup=markup
@@ -215,36 +226,44 @@ def main():
                             
                         # end if
                         print(result)
+                        continue
                     # end if
+
                     
+                # get other information for our interaction
+                if update.message:
+                    origin, peer_id = get_sender_infos(update.message)
+                    current_image = 0
+                    photos = cache_peer_images(peer_id, force=True)
+                    
+                    
+                # if it same command
                 if not update.message or not update.message.entities:
                     pass
                 else:
                     for entity in update.message.entities:
-                        
-                        
-                      
                         
                         # MessageEntity
                         print('-------')
                         print('entity.type',entity.type)
                         print('-------')
                         
-                        
                         if entity.type == "bot_command":
-                            command = update.message.text[entity.offset:entity.offset+entity.length]
+                            command = text_message[entity.offset:entity.offset+entity.length]
                             print('command:',command)
                             if command == "отправить фото" or command == "/1":
-                                bot.send_message(update.message.chat.id, "отправьте фото пожалуйста")
+                                bot.send_message(chat_id, "отправьте фото пожалуйста")
+                                continue
                             elif command == "задать вопрос" or command == "/2":
-                                bot.send_message(update.message.chat.id, "ваш вопрос будет отпарвлен нашему менеджеру")
+                                bot.send_message(chat_id, "ваш вопрос будет отпарвлен нашему менеджеру")
+                                continue
                             elif  command == "/unkey":
-                                hide_keyboard(update.message.chat.id)
+                                hide_keyboard(chat_id)
                             elif command == "/start":
-                                do_keyboard(update.message.chat.id)
+                                do_keyboard(chat_id)
                         
 
-
+                #send inline buttons
                 buttons = [[],[]]  # 2 rows
                 buttons[0].append(InlineKeyboardButton(
                     "отправить фото", callback_data="{peer_id};{curr_pos};True".format(peer_id=peer_id, curr_pos=current_image)
@@ -255,19 +274,18 @@ def main():
                     # "/2 задать вопрос", callback_data="/2 задать_вопрос"
                 ))
                 markup = InlineKeyboardMarkup(buttons)
-    
-                print(bot.send_msg(update.message.chat.id, "что вам необходимо сделать?", reply_markup=markup))
+                print(bot.send_msg(chat_id, "что вам необходимо сделать?", reply_markup=markup))
                     
 
-
+                createEvent(text_message, ObjectId)
 
                     # # MessageEntity
                     # if entity.type == "bot_command":
-                    #     command = update.message.text[entity.offset:entity.offset+entity.length]
+                    #     command = text_message[entity.offset:entity.offset+entity.length]
                     #     if command == "/key":
-                    #         do_keyboard(update.message.chat.id)
+                    #         do_keyboard(chat_id)
                     #     elif command == "/unkey":
-                    #         hide_keyboard(update.message.chat.id)
+                    #         hide_keyboard(chat_id)
                     #     # end if
 
         except KeyError as e:
@@ -277,6 +295,29 @@ def main():
         # end for update
     # end while forever
 # end def main
+
+
+
+def createEvent(textm,objid):
+    PARAMS = {'login':log_e,'password':pass_e}
+    r = requests.get(url = url_e, params = PARAMS)
+    data = r.json()
+
+    access_token = data['access_token']
+    refresh_token = data['refresh_token']
+    print(data,access_token,refresh_token)
+    
+    if(objid>0):
+        PARAMS = {'ApplicationId':AppId,
+                    'Value':'{"test":"test"}',
+                    'ObjectId':objid,
+                    'ActionName':'Chat',
+                    'StatusId':1}
+        r = requests.post(url = url_c, params = PARAMS)
+        data = r.json()
+
+
+
 
 # noinspection PyTypeChecker
 def generate_page(current_image, peer_id, photos):
