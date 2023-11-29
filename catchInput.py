@@ -167,6 +167,7 @@ def main():
             for update in bot.get_updates(limit=1, offset=last_update_id+1):
                 last_update_id = update.update_id
                 origin, peer_id = get_sender_infos(update.message)
+                
                 current_image = 0
                 photos = cache_peer_images(peer_id, force=True)
                         
