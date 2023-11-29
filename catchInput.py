@@ -305,16 +305,18 @@ def createEvent(textm,objid):
 
     access_token = data['access_token']
     refresh_token = data['refresh_token']
-    print(data,access_token,refresh_token)
+    # print(data,access_token,refresh_token)
     
     if(objid>0):
+        Headers = { 'Authorization' : "Bearer "+str(access_token) }
         PARAMS = {'ApplicationId':AppId,
-                    'Value':'{"test":"test"}',
+                    'Value':'{"test":"test","text":"'+str(textm)+'"}',
                     'ObjectId':objid,
                     'ActionName':'Chat',
                     'StatusId':1}
-        r = requests.post(url = url_c, params = PARAMS)
+        r = requests.post(url = url_c, params = PARAMS, headers=Headers)
         data = r.json()
+        print(data)
 
 
 
