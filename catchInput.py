@@ -9,16 +9,23 @@ from some import API_KEY, pgdb, pguser, pgpswd, pghost, pgport, pgschema, url_e,
 import requests
 import timeit
 import uuid
-
-
-
+from io import BytesIO
+import sys
+import pprint
 photo_cache = {}  # stores the images.
 bot = Bot(API_KEY)
+from base64 import b64encode
 
+from DictObject import DictObject
 
+from luckydonaldUtils.encoding import to_binary as b, to_native as n
+from luckydonaldUtils.exceptions import assert_type_or_raise
 
-
+pp = pprint.PrettyPrinter(indent=4)
+pp0 = pprint.PrettyPrinter(width=41, compact=True)
 AppId = 14
+#посмотри стаусы в аппке
+dafStatus = 34
 
 def selByPhoneFromBase(name):
     limit = 1
@@ -147,7 +154,7 @@ def selByChatIdFromBase(name, field):
          with conpg:
              with conpg.cursor() as curpg:
                     limit = 1
-                    sql = " select '"+str(field)+"' as str from objects where  \"Enabled\" = 1 and \"chat_id\" = '"+str(name)+"'  limit "+str(limit)  # coock_str is not null and
+                    sql = " select "+str(field)+" as str from objects where  \"Enabled\" = 1 and \"chat_id\" = '"+str(name)+"'  limit "+str(limit)  # coock_str is not null and
                     # params={"name":name}
                     # curpg.execute(sql,params)
                     curpg.execute(sql)
@@ -157,7 +164,82 @@ def selByChatIdFromBase(name, field):
     except psycopg2.DatabaseError as e:
         print('Error %s' % e)
 
+def get_file(file_url, as_png=True):
+    r = requests.get(file_url)
+    if r.status_code != 200:
+        logger.error("Download returned: {}".format(r.content))
+        return None
+    # end if
+    fake_input = BytesIO(r.content)
+    if not as_png:
+        return fake_input
+    # end if
+    from PIL import Image  # pip install Pillow
+    im = Image.open(fake_input)
+    del fake_input
+    fake_output = BytesIO()
+    im.save(fake_output, "PNG")
+    del im
+    fake_output.seek(0)
+    return fake_output
+# end def
 
+def iterm_show_file(filename, data=None, inline=True, width="auto", height="auto", preserve_aspect_ratio=True):
+    """
+
+    https://iterm2.com/documentation-images.html
+    
+    :param filename: 
+    :param data: 
+    :param inline: 
+    :param width:  
+    :param height: 
+    :param preserve_aspect_ratio: 
+    
+    Size:
+        - N   (Number only): N character cells.
+        - Npx (Number + px): N pixels.
+        - N%  (Number + %):  N percent of the session's width or height.
+        - auto:              The image's inherent size will be used to determine an appropriate dimension.
+    :return: 
+    """
+    width = str(width) if width is not None else "auto"
+    height = str(height) if height is not None else "auto"
+    if data is None:
+        data = read_file_to_buffer(filename)
+    # end if
+    data_bytes = data.getvalue()
+    output = "\033]1337;File=" \
+             "name={filename};size={size};inline={inline};" \
+             "preserveAspectRatio={preserve};width={width};height={height}:{data}\a\n".format(
+        filename=n(b64encode(b(filename))), size=len(data_bytes), inline=1 if inline else 0,
+        width=width, height=height, preserve=1 if preserve_aspect_ratio else 0,
+        data=n(b64encode(data_bytes)),
+    )
+    #sys.stdout.write(output)
+    return output
+# end if
+
+
+def process_file( file, caption, file_type="file", as_png=False, inline=True, height=None):
+    file_object = bot.get_file(file.file_id)
+    file_url = bot.get_download_url(file_object)
+    file_content = get_file(file_url, as_png=as_png)
+    file_name = file_url.split("/")[-1]
+    if as_png:
+        file_name = file_name + ".png"
+    # end if
+    save_file_name = str(file.file_id) + "__" + file_name
+    return "[{type} {file_id}]\n{image}\n{caption}\n{file_name}".format(
+        file_id=file.file_id, caption=(" " + caption if caption else ""),
+        image=iterm_show_file(save_file_name, data=file_content, inline=inline, height=height),
+        type=file_type, file_name=save_file_name
+    )
+# end def
+
+def printf(format, *args):
+    sys.stdout.write(format % args)
+    
 def main():
     my_info=bot.get_me()
     print("Information about myself: {info}".format(info=my_info))
@@ -170,16 +252,41 @@ def main():
                 #get chat and text
                 chat_id = False
                 text_message = False
-                print(update)
+                print(' ')
+                print(' ')
+                pp0.pprint(update)
+                
+                
+                if not update.message:
+                    continue
+                
+                msg = update.message
+                
                 if(update.callback_query)and(update.callback_query.message)and(update.callback_query.message.chat)and(update.callback_query.message.chat.id):
-                    print('update.callback_query.message.chat.id', update.callback_query.message.chat.id)
+                    # print('update.callback_query.message.chat.id', update.callback_query.message.chat.id)
                     text_message = update.callback_query.message.text
                     chat_id = update.callback_query.message.chat.id
-                if(update.message)and(update.message.chat)and(update.message.chat.id):
-                    print('update update.message.chat.id', update.message.chat.id)
-                    text_message = update.message.text
-                    chat_id = update.message.chat.id
+                if(msg)and(msg.chat)and(msg.chat.id):
+                    # print('update msg.chat.id', msg.chat.id)
+                    text_message = msg.text
+                    chat_id = msg.chat.id
                     
+                if "photo" in msg:
+                    print('------------photo', msg.chat.id)
+                    photo = msg.photo[0]
+                    for p in msg.photo[1:]:
+                        if p.file_size > photo.file_size:
+                            photo = p
+                        # end if
+                    # end for
+                    result01 = process_file(photo, msg.caption, file_type="photo", height="10")
+                    print('результат отправки ответа на картинку:',result01)
+                if "sticker" in msg:
+                    print('-------------sticker', msg.chat.id)
+                    result0 = process_file(msg.sticker, msg.caption, file_type="sticker", as_png=True, height="10")
+                    print('результат отправки ответа на стиккер:',result0)
+       
+       
                 #check user
                 fio = selByChatIdFromBase(chat_id, 'fio')
                 if not fio:
@@ -188,11 +295,22 @@ def main():
                         fio = selByPinFromBase(text_message,chat_id)
                         if fio:
                             bot.send_message(chat_id, "добро пожаловать в систему для получения бонусов Дом Отель, "+str(fio[0]))
-                            ObjectId = selByChatIdFromBase(chat_id, 'id')
                         else:
                             #отказать    
                             bot.send_message(chat_id, "ваш аккаунт не зарегиcтрирован в нашей системе, получите регистрационный код у нашего менеджера")
                             continue
+
+                if not fio:
+                   print('!!!!!!!!!!!!-------------------- bad thing for chat:',chat_id)
+                   continue 
+               
+                
+                ObjectId = selByChatIdFromBase(chat_id, 'id')
+                # print('user:',ObjectId,',',fio)
+                fio = (fio[0][0])
+                ObjectId = (ObjectId[0][0])
+                print('!user:',ObjectId,',',fio)
+                
                 
                 #if it inline button reaction 
                 if update.callback_query:
@@ -225,7 +343,7 @@ def main():
                             
                             
                         # end if
-                        print(result)
+                        print('результат отправки ответа на реакцию кнопки',result)
                         continue
                     # end if
 
@@ -245,7 +363,7 @@ def main():
                         
                         # MessageEntity
                         print('-------')
-                        print('entity.type',entity.type)
+                        print('тип сообщения - entity.type:',entity.type)
                         print('-------')
                         
                         if entity.type == "bot_command":
@@ -274,10 +392,11 @@ def main():
                     # "/2 задать вопрос", callback_data="/2 задать_вопрос"
                 ))
                 markup = InlineKeyboardMarkup(buttons)
-                print(bot.send_msg(chat_id, "что вам необходимо сделать?", reply_markup=markup))
-                    
-
-                createEvent(text_message, ObjectId)
+                result2 = bot.send_msg(chat_id, "что вам необходимо сделать?", reply_markup=markup)
+                
+                print('результат отправки ответа на тектовое сообщение',result2)
+                if(ObjectId>0):
+                    createEvent(text_message, ObjectId)
 
                     # # MessageEntity
                     # if entity.type == "bot_command":
@@ -310,13 +429,14 @@ def createEvent(textm,objid):
     if(objid>0):
         Headers = { 'Authorization' : "Bearer "+str(access_token) }
         PARAMS = {'ApplicationId':AppId,
-                    'Value':'{"test":"test","text":"'+str(textm)+'"}',
+                    'Value':'{"source":"Telegram","type":"text","text":"'+str(textm)+'"}', 
                     'ObjectId':objid,
                     'ActionName':'Chat',
-                    'StatusId':1}
-        r = requests.post(url = url_c, params = PARAMS, headers=Headers)
+                    'StatusId':dafStatus}
+        # print('PARAMS',PARAMS)
+        r = requests.post(url = url_c, json = PARAMS, data = PARAMS, headers=Headers)
         data = r.json()
-        print(data)
+        # print(data)
 
 
 
