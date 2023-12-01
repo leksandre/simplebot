@@ -10,13 +10,16 @@ import requests
 import timeit
 import uuid
 from io import BytesIO
+import os
 import sys
+import cv2
 import pprint
 photo_cache = {}  # stores the images.
 bot = Bot(API_KEY)
 from base64 import b64encode
 
 from DictObject import DictObject
+import datetime
 
 from luckydonaldUtils.encoding import to_binary as b, to_native as n
 from luckydonaldUtils.exceptions import assert_type_or_raise
@@ -26,6 +29,8 @@ pp0 = pprint.PrettyPrinter(width=41, compact=True)
 AppId = 14
 #посмотри стаусы в аппке
 dafStatus = 34
+tenant = 'domotel'
+domen = 'https://'+tenant+'-admin.mobsted.ru'
 
 def selByPhoneFromBase(name):
     limit = 1
@@ -164,12 +169,61 @@ def selByChatIdFromBase(name, field):
     except psycopg2.DatabaseError as e:
         print('Error %s' % e)
 
-def get_file(file_url, as_png=True):
+
+
+         
+def insertFile(Name,FileName,LinkId,ObjectId,Url,FileSize,Height,Width,Extension):
+        
+    try:
+        for x in range(0, 9999):
+            try:
+                    conpg = psycopg2.connect(database=pgdb, user=pguser, password=pgpswd,
+                            host=pghost,port=pgport) # , options=f'-c search_path={pgschema}')
+            except Exception as e:
+                print('pgbouncer exception 1 - ',e)
+                time.sleep(0.2)
+                pass
+            finally:
+                break
+        
+        if 'conpg' not in locals():
+            return False
+
+        if conpg:
+         with conpg:
+             with conpg.cursor() as curpg:
+                sql = " Set search_path =%(pgdb)s "
+                params={"pgdb":pgdb}
+                curpg.execute(sql,params)
+                conpg.commit()
+
+        if conpg:
+         with conpg:
+             with conpg.cursor() as curpg:
+                    sql = " insert into files (\"Name\", \"FileName\",\"LinkId\", \"ObjectId\", \"Url\", \"FileSize\", \"Height\", \"Width\", \"Extension\",\"LinksToTable\",\"Backendname\') \
+                            values (%(Name)s,%(FileName)s,%(LinkId)s,%(ObjectId)s,%(Url)s,%(FileSize)s,%(Height)s,%(Width)s,%(Extension)s,'Backend','Chat')"
+                    params={"Name":Name,"FileName":FileName,"LinkId":LinkId,"ObjectId":ObjectId,"Url":Url,"FileSize":FileSize,"Height":Height,"Width":Width,"Extension":Extension}
+                    curpg.execute(sql,params)
+                    conpg.commit()
+                    print('fixed')
+                    return True
+                    
+    except psycopg2.DatabaseError as e:
+        print('Error %s' % e)
+
+
+
+
+def get_file(file_url, filePath, as_png=True):
     r = requests.get(file_url)
     if r.status_code != 200:
         logger.error("Download returned: {}".format(r.content))
         return None
     # end if
+    
+    with open(filePath, mode="wb") as file:
+        file.write(r.content)
+    
     fake_input = BytesIO(r.content)
     if not as_png:
         return fake_input
@@ -221,10 +275,23 @@ def iterm_show_file(filename, data=None, inline=True, width="auto", height="auto
 # end if
 
 
-def process_file( file, caption, file_type="file", as_png=False, inline=True, height=None):
+def process_file( file, caption, file_type="file", as_png=False, inline=True, height=None, pathsFiles = []):
     file_object = bot.get_file(file.file_id)
     file_url = bot.get_download_url(file_object)
-    file_content = get_file(file_url, as_png=as_png)
+    print('file_url',file_url)
+    
+    tmpName = BytesIO()
+    file_ext0 = file_url.split(".")[-1]
+    tmpName = tmpName+file_ext0
+    time = datetime.now()
+    str_time=time.strftime("/%Y/%m/%d/")
+    filePath = '/home/per_server/tenants/www/tenants/'+tenant+'/uploads'+str_time+tmpName
+    
+    file_content = get_file(file_url, filePath=filePath, as_png=as_png)
+    
+    print('filePath ',filePath)
+    pathsFiles.append(filePath)
+    
     file_name = file_url.split("/")[-1]
     if as_png:
         file_name = file_name + ".png"
@@ -270,21 +337,6 @@ def main():
                     # print('update msg.chat.id', msg.chat.id)
                     text_message = msg.text
                     chat_id = msg.chat.id
-                    
-                if "photo" in msg:
-                    print('------------photo', msg.chat.id)
-                    photo = msg.photo[0]
-                    for p in msg.photo[1:]:
-                        if p.file_size > photo.file_size:
-                            photo = p
-                        # end if
-                    # end for
-                    result01 = process_file(photo, msg.caption, file_type="photo", height="10")
-                    print('результат отправки ответа на картинку:',result01)
-                if "sticker" in msg:
-                    print('-------------sticker', msg.chat.id)
-                    result0 = process_file(msg.sticker, msg.caption, file_type="sticker", as_png=True, height="10")
-                    print('результат отправки ответа на стиккер:',result0)
        
        
                 #check user
@@ -312,7 +364,33 @@ def main():
                 print('!user:',ObjectId,',',fio)
                 
                 
-                #if it inline button reaction 
+                
+                
+                
+                
+                #
+                #process media content
+                pathsFiles = ['']
+                if "photo" in msg:
+                    print('------------photo', msg.chat.id)
+                    photo = msg.photo[0]
+                    for p in msg.photo[1:]:
+                        if p.file_size > photo.file_size:
+                            photo = p
+                        # end if
+                    # end for
+                    result01 = process_file(photo, msg.caption, file_type="photo", height="10", pathsFiles=pathsFiles)
+                    print('результат отправки ответа на картинку:',result01)
+                    text_message = msg.caption
+                if "sticker" in msg:
+                    print('-------------sticker', msg.chat.id)
+                    result0 = process_file(msg.sticker, msg.caption, file_type="sticker", as_png=True, height="10", pathsFiles=pathsFiles)
+                    print('результат отправки ответа на стиккер:',result0)
+                    text_message = msg.caption
+                
+                
+                #
+                #if it inline button reaction process intine button actions
                 if update.callback_query:
                     # callback_query.message is the original message the bot sent
                         peer_id, current_image, do_submit = update.callback_query.data.split(";")
@@ -347,7 +425,8 @@ def main():
                         continue
                     # end if
 
-                    
+
+                #
                 # get other information for our interaction
                 if update.message:
                     origin, peer_id = get_sender_infos(update.message)
@@ -355,6 +434,7 @@ def main():
                     photos = cache_peer_images(peer_id, force=True)
                     
                     
+                #
                 # if it same command
                 if not update.message or not update.message.entities:
                     pass
@@ -381,6 +461,7 @@ def main():
                                 do_keyboard(chat_id)
                         
 
+                #
                 #send inline buttons
                 buttons = [[],[]]  # 2 rows
                 buttons[0].append(InlineKeyboardButton(
@@ -395,8 +476,19 @@ def main():
                 result2 = bot.send_msg(chat_id, "что вам необходимо сделать?", reply_markup=markup)
                 
                 print('результат отправки ответа на тектовое сообщение',result2)
-                if(ObjectId>0):
-                    createEvent(text_message, ObjectId)
+                
+                
+                
+                
+                eventcreated = False
+                
+                #
+                #save event
+                if(ObjectId>0 and (text_message or (len(pathsFiles)>0))):
+                    eventcreated = createEvent(text_message, ObjectId, pathsFiles)
+                
+                if not eventcreated:
+                    bot.send_message(chat_id, "что-то не так, ваше сообщение недоставлено, повторите отправку через некоторое время или свяжитесь с анми по телефону указанному на сайте https://xn--d1acscjb2a6f.xn--p1ai/#contacts")
 
                     # # MessageEntity
                     # if entity.type == "bot_command":
@@ -417,27 +509,84 @@ def main():
 
 
 
-def createEvent(textm,objid):
+def createEvent(textm,objid, pathsFiles = []):
+    if(not(objid>0)):
+        return False
+    
     PARAMS = {'login':log_e,'password':pass_e}
     r = requests.get(url = url_e, params = PARAMS)
+    if r.status_code != 200:
+        return False
     data = r.json()
-
+    if not 'access_token' in data:
+        return False
+    
     access_token = data['access_token']
     refresh_token = data['refresh_token']
     # print(data,access_token,refresh_token)
     
-    if(objid>0):
-        Headers = { 'Authorization' : "Bearer "+str(access_token) }
-        PARAMS = {'ApplicationId':AppId,
-                    'Value':'{"source":"Telegram","type":"text","text":"'+str(textm)+'"}', 
-                    'ObjectId':objid,
-                    'ActionName':'Chat',
-                    'StatusId':dafStatus}
-        # print('PARAMS',PARAMS)
-        r = requests.post(url = url_c, json = PARAMS, data = PARAMS, headers=Headers)
-        data = r.json()
-        # print(data)
 
+    
+    Headers = { 'Authorization' : "Bearer "+str(access_token) }
+    PARAMS = {'ApplicationId':AppId,
+                'Value':'{"source":"Telegram"' + ((',"text":"'+str(textm)+'"') if textm else '') + '}', #,"type":"text"
+                'ObjectId':objid,
+                'ActionName':'Chat',
+                'StatusId':dafStatus}
+    # print('PARAMS',PARAMS)
+    r = requests.post(url = url_c, json = PARAMS, data = PARAMS, headers=Headers)
+    if r.status_code != 200:
+        return False
+    data = r.json()
+    
+    print(data)
+
+    if len(pathsFiles)>0:
+        for x in pathsFiles:
+            try:
+                file_size = os.path.getsize(x)
+                print(f"File Size in Bytes is {file_size}")
+            except FileNotFoundError:
+                print("File not found.")
+                return False
+            except OSError:
+                print("OS error occurred.")
+                return False
+            except Exception as e:
+                print('read file exception 0 - ',e)
+                return False
+                
+            try:
+                im = cv2.imread(x)
+                h, w, c = im.shape
+                print('width:  ', w)
+                print('height: ', h)
+                print('channel:', c)
+            except FileNotFoundError:
+                print("File not found.")
+                return False
+            except Exception as e:
+                print('read file exception 1 - ',e)
+                return False
+                
+            Name = x
+            FileName = x.split("/")[-1]
+            LinkId = 560
+            ObjectId = objid
+            Url = tenant+x
+            FileSize = file_size
+            Height = w
+            Width = h
+            Extension = x.split(".")[-1]
+  
+            res = insertFile(Name=Name,FileName=FileName,LinkId=LinkId,ObjectId=ObjectId,Url=Url,FileSize=FileSize,Height=Height,Width=Width,Extension=Extension)
+            if not res:
+                return False
+            
+    #if all process good
+    return True
+
+    #start adding file
 
 
 
