@@ -18,6 +18,9 @@ photo_cache = {}  # stores the images.
 bot = Bot(API_KEY)
 from base64 import b64encode
 
+import string
+import random
+
 from DictObject import DictObject
 import datetime
 
@@ -200,7 +203,7 @@ def insertFile(Name,FileName,LinkId,ObjectId,Url,FileSize,Height,Width,Extension
         if conpg:
          with conpg:
              with conpg.cursor() as curpg:
-                    sql = " insert into files (\"Name\", \"FileName\",\"LinkId\", \"ObjectId\", \"Url\", \"FileSize\", \"Height\", \"Width\", \"Extension\",\"LinksToTable\",\"Backendname\') \
+                    sql = " insert into files (\"Name\", \"FileName\",\"LinkId\", \"ObjectId\", \"Url\", \"FileSize\", \"Height\", \"Width\", \"Extension\",\"LinksToTable\",\"Backendname\") \
                             values (%(Name)s,%(FileName)s,%(LinkId)s,%(ObjectId)s,%(Url)s,%(FileSize)s,%(Height)s,%(Width)s,%(Extension)s,'Backend','Chat')"
                     params={"Name":Name,"FileName":FileName,"LinkId":LinkId,"ObjectId":ObjectId,"Url":Url,"FileSize":FileSize,"Height":Height,"Width":Width,"Extension":Extension}
                     curpg.execute(sql,params)
@@ -275,17 +278,26 @@ def iterm_show_file(filename, data=None, inline=True, width="auto", height="auto
 # end if
 
 
-def process_file( file, caption, file_type="file", as_png=False, inline=True, height=None, pathsFiles = []):
+def process_file( file, caption, pathsFiles, file_type="file", as_png=False, inline=True, height=None):
     file_object = bot.get_file(file.file_id)
     file_url = bot.get_download_url(file_object)
     print('file_url',file_url)
     
-    tmpName = BytesIO()
+    N = 7
+    tmpName = ''.join(random.choices(string.ascii_lowercase + string.digits, k=N))
     file_ext0 = file_url.split(".")[-1]
-    tmpName = tmpName+file_ext0
-    time = datetime.now()
+    tmpName = tmpName+'.'+file_ext0
+    time = datetime.datetime.now()
     str_time=time.strftime("/%Y/%m/%d/")
-    filePath = '/home/per_server/tenants/www/tenants/'+tenant+'/uploads'+str_time+tmpName
+    filePath = '/home/per_server/tenants/www/tenants/'+tenant+'/uploads'+str_time
+
+    try:
+        os.makedirs(filePath, exist_ok=True)
+    except KeyError as e:
+        print(' over KeyError 42 ' + str(e))
+        return False
+        
+    filePath += tmpName
     
     file_content = get_file(file_url, filePath=filePath, as_png=as_png)
     
@@ -370,7 +382,7 @@ def main():
                 
                 #
                 #process media content
-                pathsFiles = ['']
+                pathsFiles = []
                 if "photo" in msg:
                     print('------------photo', msg.chat.id)
                     photo = msg.photo[0]
@@ -379,12 +391,16 @@ def main():
                             photo = p
                         # end if
                     # end for
-                    result01 = process_file(photo, msg.caption, file_type="photo", height="10", pathsFiles=pathsFiles)
+                    result01 = process_file(photo, msg.caption, pathsFiles, file_type="photo", height="10")
+                    if not result01:
+                        return False
                     print('результат отправки ответа на картинку:',result01)
                     text_message = msg.caption
                 if "sticker" in msg:
                     print('-------------sticker', msg.chat.id)
-                    result0 = process_file(msg.sticker, msg.caption, file_type="sticker", as_png=True, height="10", pathsFiles=pathsFiles)
+                    result0 = process_file(msg.sticker, msg.caption, pathsFiles, file_type="sticker", as_png=True, height="10")
+                    if not result01:
+                        return False
                     print('результат отправки ответа на стиккер:',result0)
                     text_message = msg.caption
                 
@@ -463,27 +479,30 @@ def main():
 
                 #
                 #send inline buttons
-                buttons = [[],[]]  # 2 rows
-                buttons[0].append(InlineKeyboardButton(
-                    "отправить фото", callback_data="{peer_id};{curr_pos};True".format(peer_id=peer_id, curr_pos=current_image)
-                    # "/1 отправить фото", callback_data="/1 отправить_фото"
-                ))
-                buttons[1].append(InlineKeyboardButton(
-                    "задать вопрос", callback_data="{peer_id};{curr_pos};False".format(peer_id=peer_id, curr_pos=current_image)
-                    # "/2 задать вопрос", callback_data="/2 задать_вопрос"
-                ))
-                markup = InlineKeyboardMarkup(buttons)
-                result2 = bot.send_msg(chat_id, "что вам необходимо сделать?", reply_markup=markup)
-                
-                print('результат отправки ответа на тектовое сообщение',result2)
-                
-                
+                if((len(pathsFiles)==0)):
+                    buttons = [[],[]]  # 2 rows
+                    buttons[0].append(InlineKeyboardButton(
+                        "отправить фото", callback_data="{peer_id};{curr_pos};True".format(peer_id=peer_id, curr_pos=current_image)
+                        # "/1 отправить фото", callback_data="/1 отправить_фото"
+                    ))
+                    buttons[1].append(InlineKeyboardButton(
+                        "задать вопрос", callback_data="{peer_id};{curr_pos};False".format(peer_id=peer_id, curr_pos=current_image)
+                        # "/2 задать вопрос", callback_data="/2 задать_вопрос"
+                    ))
+                    markup = InlineKeyboardMarkup(buttons)
+                    result2 = bot.send_msg(chat_id, "что вам необходимо сделать?", reply_markup=markup)
+                    
+                    #print('результат отправки ответа на тектовое сообщение',result2)
+                    
+                else:
+                    result2 = bot.send_message(chat_id, "спасибо, в ближайщее время мы обработаем полученные данные")
                 
                 
                 eventcreated = False
                 
                 #
                 #save event
+                print('------- pathsFiles',pathsFiles)
                 if(ObjectId>0 and (text_message or (len(pathsFiles)>0))):
                     eventcreated = createEvent(text_message, ObjectId, pathsFiles)
                 
@@ -515,16 +534,22 @@ def createEvent(textm,objid, pathsFiles = []):
     
     PARAMS = {'login':log_e,'password':pass_e}
     r = requests.get(url = url_e, params = PARAMS)
+    
     if r.status_code != 200:
         return False
+    
     data = r.json()
+    
     if not 'access_token' in data:
         return False
     
-    access_token = data['access_token']
-    refresh_token = data['refresh_token']
-    # print(data,access_token,refresh_token)
-    
+    try:
+        access_token = data['access_token']
+        refresh_token = data['refresh_token']
+        # print(data,access_token,refresh_token)
+    except KeyError as e:
+        print(' over KeyError 43 ' + str(e))
+        return False
 
     
     Headers = { 'Authorization' : "Bearer "+str(access_token) }
@@ -538,8 +563,17 @@ def createEvent(textm,objid, pathsFiles = []):
     if r.status_code != 200:
         return False
     data = r.json()
+
+    if not 'meta' in data:
+        return False
+    if not 'data' in data:
+        return False
     
-    print(data)
+    try:
+        eventId = data['data'][0]['id']
+    except KeyError as e:
+        print(' over KeyError 45  ' + str(e))
+        return False
 
     if len(pathsFiles)>0:
         for x in pathsFiles:
@@ -547,7 +581,7 @@ def createEvent(textm,objid, pathsFiles = []):
                 file_size = os.path.getsize(x)
                 print(f"File Size in Bytes is {file_size}")
             except FileNotFoundError:
-                print("File not found.")
+                print("File not found.1",x)
                 return False
             except OSError:
                 print("OS error occurred.")
@@ -563,17 +597,18 @@ def createEvent(textm,objid, pathsFiles = []):
                 print('height: ', h)
                 print('channel:', c)
             except FileNotFoundError:
-                print("File not found.")
+                print("File not found.0",x)
                 return False
             except Exception as e:
                 print('read file exception 1 - ',e)
                 return False
                 
-            Name = x
+            Name = (x.replace("/home/per_server/tenants/www",""))
             FileName = x.split("/")[-1]
-            LinkId = 560
+            LinkId = eventId
             ObjectId = objid
-            Url = tenant+x
+            Url = domen + Name
+            print('Url',Url)
             FileSize = file_size
             Height = w
             Width = h
