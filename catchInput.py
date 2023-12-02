@@ -335,16 +335,59 @@ def main():
                 print(' ')
                 pp0.pprint(update)
                 
-                
+                if(update.callback_query)and(update.callback_query.message)and(update.callback_query.message.chat)and(update.callback_query.message.chat.id):
+                    # print('update.callback_query.message.chat.id', update.callback_query.message.chat.id)
+                    text_message = update.callback_query.message.text
+                    chat_id = update.callback_query.message.chat.id
+                #
+                #if it inline button reaction process intine button actions
+                if update.callback_query:
+                    # callback_query.message is the original message the bot sent
+                        if(not chat_id):
+                            continue
+                        
+                        peer_id, current_image, do_submit = update.callback_query.data.split(";")
+                        peer_id, current_image = int(peer_id), int(current_image)  # str -> int
+                        do_submit = do_submit == "True"  # str -> bool
+                        photos = cache_peer_images(peer_id)
+                        result_image, markup = generate_page(current_image, peer_id, photos)
+                        assert isinstance(result_image, PhotoSize)
+                        
+                        try:
+                            if do_submit:
+                                #bot.answer_callback_query(update.callback_query.id, text="Sending photo...")#description='Bad Request: query is too old and response timeout expired or query ID is invalid
+                                result = bot.send_message(chat_id, "отправьте ваше фото пожалуйста, принимаются только фотографии сделанные в текуще месяце")
+                                
+                                # result = bot.send_photo(chat_id=chat_id, photo=result_image.file_id)
+                                
+                            else:
+                                #bot.answer_callback_query(update.callback_query.id, text="Sending query...")#description='Bad Request: query is too old and response timeout expired or query ID is invalid
+                                result = bot.send_message(chat_id, "напишите ваш вопрос, он будет передан нашему менеджеру, который свяжется с вам для разъяснения ситуации")
+                        except KeyError as e:
+                            print(' over KeyError  ' + str(e))  
+                             
+                            # result = bot.edit_message_text(
+                            #     "Profile pic {num}\n{w}x{h}, {size}B".format(
+                            #         num=current_image, w=result_image.width, h=result_image.height, size=result_image.file_size
+                            #     ),
+                            #     chat_id=chat_id,
+                            #     message_id=update.callback_query.message.message_id,
+                            #     disable_web_page_preview=False,
+                            #     reply_markup=markup
+                            # )
+                            
+                            
+                        # end if
+                        print('результат отправки ответа на реакцию кнопки',result)
+                        continue
+                    # end if
+
+
                 if not update.message:
                     continue
                 
                 msg = update.message
                 
-                if(update.callback_query)and(update.callback_query.message)and(update.callback_query.message.chat)and(update.callback_query.message.chat.id):
-                    # print('update.callback_query.message.chat.id', update.callback_query.message.chat.id)
-                    text_message = update.callback_query.message.text
-                    chat_id = update.callback_query.message.chat.id
                 if(msg)and(msg.chat)and(msg.chat.id):
                     # print('update msg.chat.id', msg.chat.id)
                     text_message = msg.text
@@ -405,42 +448,6 @@ def main():
                     text_message = msg.caption
                 
                 
-                #
-                #if it inline button reaction process intine button actions
-                if update.callback_query:
-                    # callback_query.message is the original message the bot sent
-                        peer_id, current_image, do_submit = update.callback_query.data.split(";")
-                        peer_id, current_image = int(peer_id), int(current_image)  # str -> int
-                        do_submit = do_submit == "True"  # str -> bool
-                        photos = cache_peer_images(peer_id)
-                        result_image, markup = generate_page(current_image, peer_id, photos)
-                        assert isinstance(result_image, PhotoSize)
-                        if do_submit:
-                            bot.answer_callback_query(update.callback_query.id, text="Sending photo...")
-                            result = bot.send_message(chat_id, "отправьте ваше фото пожалуйста, принимаются только фотографии сделанные в текуще месяце")
-                            
-                            # result = bot.send_photo(chat_id=chat_id, photo=result_image.file_id)
-                            
-                        else:
-                            bot.answer_callback_query(update.callback_query.id, text="Sending query...")
-                            result = bot.send_message(chat_id, "напишите ваш вопрос, он будет передан нашему менеджеру, который свяжется с вам для разъяснения ситуации")
-                            
-                            # result = bot.edit_message_text(
-                            #     "Profile pic {num}\n{w}x{h}, {size}B".format(
-                            #         num=current_image, w=result_image.width, h=result_image.height, size=result_image.file_size
-                            #     ),
-                            #     chat_id=chat_id,
-                            #     message_id=update.callback_query.message.message_id,
-                            #     disable_web_page_preview=False,
-                            #     reply_markup=markup
-                            # )
-                            
-                            
-                        # end if
-                        print('результат отправки ответа на реакцию кнопки',result)
-                        continue
-                    # end if
-
 
                 #
                 # get other information for our interaction
@@ -475,27 +482,41 @@ def main():
                                 hide_keyboard(chat_id)
                             elif command == "/start":
                                 do_keyboard(chat_id)
+                    
+                skipSendButtons = False
+                
+                if(text_message):
+                  countWords = len(text_message.split())
+                  if text_message[-1] =='?':
+                    esult2 = bot.send_message(chat_id, "в ближайшее время наш сотруник с вами свяжется для ответа на ваш вопрос")
+                    skipSendButtons = True
+                  else:
+                    if countWords>1:
+                        result2 = bot.send_message(chat_id, "в ближайшее время мы обработаем ваше сообщение, дополните его, если это необходимо для прояснения ситуции")
+                        skipSendButtons = True
+                  
                         
 
                 #
                 #send inline buttons
-                if((len(pathsFiles)==0)):
-                    buttons = [[],[]]  # 2 rows
-                    buttons[0].append(InlineKeyboardButton(
-                        "отправить фото", callback_data="{peer_id};{curr_pos};True".format(peer_id=peer_id, curr_pos=current_image)
-                        # "/1 отправить фото", callback_data="/1 отправить_фото"
-                    ))
-                    buttons[1].append(InlineKeyboardButton(
-                        "задать вопрос", callback_data="{peer_id};{curr_pos};False".format(peer_id=peer_id, curr_pos=current_image)
-                        # "/2 задать вопрос", callback_data="/2 задать_вопрос"
-                    ))
-                    markup = InlineKeyboardMarkup(buttons)
-                    result2 = bot.send_msg(chat_id, "что вам необходимо сделать?", reply_markup=markup)
-                    
-                    #print('результат отправки ответа на тектовое сообщение',result2)
-                    
-                else:
-                    result2 = bot.send_message(chat_id, "спасибо, в ближайщее время мы обработаем полученные данные")
+                if not skipSendButtons:
+                    if((len(pathsFiles)==0)):
+                        buttons = [[],[]]  # 2 rows
+                        buttons[0].append(InlineKeyboardButton(
+                            "отправить фото", callback_data="{peer_id};{curr_pos};True".format(peer_id=peer_id, curr_pos=current_image)
+                            # "/1 отправить фото", callback_data="/1 отправить_фото"
+                        ))
+                        buttons[1].append(InlineKeyboardButton(
+                            "задать вопрос", callback_data="{peer_id};{curr_pos};False".format(peer_id=peer_id, curr_pos=current_image)
+                            # "/2 задать вопрос", callback_data="/2 задать_вопрос"
+                        ))
+                        markup = InlineKeyboardMarkup(buttons)
+                        result2 = bot.send_msg(chat_id, "что вам необходимо сделать?", reply_markup=markup)
+                        
+                        #print('результат отправки ответа на тектовое сообщение',result2)
+                        
+                    else:
+                        result2 = bot.send_message(chat_id, "спасибо, в ближайщее время мы обработаем полученные данные")
                 
                 
                 eventcreated = False
@@ -507,7 +528,7 @@ def main():
                     eventcreated = createEvent(text_message, ObjectId, pathsFiles)
                 
                 if not eventcreated:
-                    bot.send_message(chat_id, "что-то не так, ваше сообщение недоставлено, повторите отправку через некоторое время или свяжитесь с анми по телефону указанному на сайте https://xn--d1acscjb2a6f.xn--p1ai/#contacts")
+                    bot.send_message(chat_id, "что-то не так, ваше сообщение недоставлено, повторите отправку через некоторое время или свяжитесь с нами по телефону указанному на сайте https://домотель.рф/#contacts")
 
                     # # MessageEntity
                     # if entity.type == "bot_command":
