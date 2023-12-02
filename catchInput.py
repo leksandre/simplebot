@@ -63,7 +63,7 @@ def selByPhoneFromBase(name):
         if conpg:
          with conpg:
              with conpg.cursor() as curpg:
-                    limit = 7
+                    limit = 1
                     sql = " select fio as str from objects where  \"Phone\" = '"+str(name)+"'  limit "+str(limit)  # coock_str is not null and
                     # params={"name":name}
                     # curpg.execute(sql,params)
@@ -105,7 +105,7 @@ def selByPinFromBase(name,tagnick):
         if conpg:
          with conpg:
              with conpg.cursor() as curpg:
-                    limit = 7
+                    limit = 1
                     sql = " select fio as str from objects where  \"PIN\" = '"+str(name)+"' and  \"chat_id\" is null and  \"PIN\" <> '' and  \"PIN\" is not null  limit "+str(limit)  # coock_str is not null and
                     # params={"name":name}
                     # curpg.execute(sql,params)
@@ -283,7 +283,7 @@ def process_file( file, caption, pathsFiles, file_type="file", as_png=False, inl
     file_url = bot.get_download_url(file_object)
     print('file_url',file_url)
     
-    N = 7
+    N = 12
     tmpName = ''.join(random.choices(string.ascii_lowercase + string.digits, k=N))
     file_ext0 = file_url.split(".")[-1]
     tmpName = tmpName+'.'+file_ext0
@@ -575,7 +575,8 @@ def createEvent(textm,objid, pathsFiles = []):
     
     Headers = { 'Authorization' : "Bearer "+str(access_token) }
     PARAMS = {'ApplicationId':AppId,
-                'Value':'{"source":"Telegram"' + ((',"text":"'+str(textm)+'"') if textm else '') + '}', #,"type":"text"
+                # 'Value':'{"source":"Telegram"' + ((',"text":"'+str(textm)+'"') if textm else '') + '}', #,"type":"text"
+                'Value':'{' + (('"&nbsp;":"'+str(textm)+'"') if textm else '') + '}', #,"type":"text"
                 'ObjectId':objid,
                 'ActionName':'Chat',
                 'StatusId':dafStatus}
