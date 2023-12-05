@@ -17,6 +17,7 @@ import pprint
 photo_cache = {}  # stores the images.
 bot = Bot(API_KEY)
 from base64 import b64encode
+import time
 
 import string
 import random
@@ -126,6 +127,88 @@ def selByPinFromBase(name,tagnick):
                     print('fixed')
                     
                     return res1
+        return False
+    except psycopg2.DatabaseError as e:
+        print('Error %s' % e)
+
+
+
+           
+def selCommentsFromBase():
+    limit = 100
+    try:
+        for x in range(0, 9999):
+            try:
+                    conpg = psycopg2.connect(database=pgdb, user=pguser, password=pgpswd,
+                            host=pghost,port=pgport) # , options=f'-c search_path={pgschema}')
+            except Exception as e:
+                print('pgbouncer exception 1 - ',e)
+                time.sleep(0.2)
+                pass
+            finally:
+                break
+        
+        if 'conpg' not in locals():
+            return False
+
+        if conpg:
+         with conpg:
+             with conpg.cursor() as curpg:
+                sql = " Set search_path =%(pgdb)s "
+                params={"pgdb":pgdb}
+                curpg.execute(sql,params)
+                conpg.commit()
+
+        if conpg:
+         with conpg:
+             with conpg.cursor() as curpg:
+                    # limit = 100 #, \"\", \"\", \"\", \"\", \"\", \"\"
+                    sql = " select comments.\"id\",\"CommentText\", \"ActionName\", \"chat_id\" from comments LEFT JOIN backend ON comments.\"LinkId\" = backend.id   LEFT JOIN objects ON objects.id = backend.\"ObjectId\" where  \"Delivered\" is null and \"chat_id\" is not null order by comments.id asc limit "+str(limit)  # coock_str is not null and
+                    # params={"name":name}
+                    # curpg.execute(sql,params)
+                    curpg.execute(sql)
+                    res1 = curpg.fetchall()
+                    return res1
+        return False
+    except psycopg2.DatabaseError as e:
+        print('Error %s' % e)
+
+
+
+
+           
+def updateCommentsFromBase(id):
+    try:
+        for x in range(0, 9999):
+            try:
+                    conpg = psycopg2.connect(database=pgdb, user=pguser, password=pgpswd,
+                            host=pghost,port=pgport) # , options=f'-c search_path={pgschema}')
+            except Exception as e:
+                print('pgbouncer exception 1 - ',e)
+                time.sleep(0.2)
+                pass
+            finally:
+                break
+        
+        if 'conpg' not in locals():
+            return False
+
+        if conpg:
+         with conpg:
+             with conpg.cursor() as curpg:
+                sql = " Set search_path =%(pgdb)s "
+                params={"pgdb":pgdb}
+                curpg.execute(sql,params)
+                conpg.commit()
+
+        if conpg:
+         with conpg:
+             with conpg.cursor() as curpg:
+                if True:             
+                    sql = " update comments set \"DeliveredDate\" =  now() , \"Delivered\" = 1 where  \"id\" = %(tagnick)s   "
+                    params={"tagnick":id}
+                    curpg.execute(sql,params)
+                    conpg.commit()
         return False
     except psycopg2.DatabaseError as e:
         print('Error %s' % e)
@@ -539,6 +622,26 @@ def main():
                     #         hide_keyboard(chat_id)
                     #     # end if
 
+
+            time.sleep(0.2)
+            comments = selCommentsFromBase()
+            if comments:
+              if len(comments)>0:
+                for comment in comments:
+                    print(comment)
+                    chat_id = comment[3]
+                    id_comment = comment[0]
+                    text_comment = comment[1]
+                    result9 = False
+                    try:
+                        result9 = bot.send_message(chat_id, text_comment)
+                        print('результат отправки комментария',result9)
+                    except KeyError as e:
+                                print(' over KeyError  ' + str(e))
+                    time.sleep(0.2)
+                    if(result9):
+                        updateCommentsFromBase(id_comment)
+        
         except KeyError as e:
             print(' over KeyError  ' + str(e))
 
