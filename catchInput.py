@@ -5,7 +5,7 @@ from pytgbot.api_types import as_array
 from pytgbot.api_types.sendable.reply_markup import ForceReply, ReplyKeyboardRemove, ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardButton, InlineKeyboardMarkup
 from pytgbot.api_types.receivable.updates import Message
 from pytgbot.api_types.receivable.media import PhotoSize
-from some import API_KEY, pgdb, pguser, pgpswd, pghost, pgport, pgschema, url_e, url_c, log_e, pass_e
+from some import API_KEY, pgdb, pguser, pgpswd, pghost, pgport, pgschema, url_e, url_c, log_e, pass_e, managers_chats_id, service_chats_id
 import requests
 import timeit
 import uuid
@@ -599,7 +599,7 @@ def main():
                         #print('результат отправки ответа на тектовое сообщение',result2)
                         
                     else:
-                        result2 = bot.send_message(chat_id, "спасибо, в ближайщее время мы обработаем полученные данные")
+                        result2 = bot.send_message(chat_id, "спасибо, в ближайщее время мы обработаем полученные данные, средства на карту зачисляются 1го и 15го числа месяца")
                 
                 
                 eventcreated = False
@@ -610,9 +610,24 @@ def main():
                 if(ObjectId>0 and (text_message or (len(pathsFiles)>0))):
                     eventcreated = createEvent(text_message, ObjectId, pathsFiles)
                 
+                #managers_chats_id, service_chats_id
+                if True:
+                  if eventcreated:
+                    for chat in managers_chats_id:
+                        if text_message:
+                            messageformanager = "--> сообщение от " + str(fio) + ': ' + '\"'+text_message+'\"'
+                            bot.send_message(chat, messageformanager)
+                        if len(pathsFiles)>0:
+                            messageformanager = "--> фото от "+str(fio)
+                            bot.send_message(chat, messageformanager)
+
+                            
                 if not eventcreated:
                     bot.send_message(chat_id, "что-то не так, ваше сообщение недоставлено, повторите отправку через некоторое время или свяжитесь с нами по телефону указанному на сайте https://домотель.рф/#contacts")
-
+                    #managers_chats_id, service_chats_id
+                    for chat in service_chats_id: 
+                        bot.send_message(chat, "--> !!!ошибка создания эвента!!!")
+                        
                     # # MessageEntity
                     # if entity.type == "bot_command":
                     #     command = text_message[entity.offset:entity.offset+entity.length]
@@ -679,7 +694,7 @@ def createEvent(textm,objid, pathsFiles = []):
     Headers = { 'Authorization' : "Bearer "+str(access_token) }
     PARAMS = {'ApplicationId':AppId,
                 # 'Value':'{"source":"Telegram"' + ((',"text":"'+str(textm)+'"') if textm else '') + '}', #,"type":"text"
-                'Value':'{' + (('"&nbsp;":"'+str(textm)+'"') if textm else '') + '}', #,"type":"text"
+                'Value':'{' + (('"&nbsp;":"'+str(textm)+'"') if textm else '"&nbsp;":"_фото_"') + '}', #,"type":"text"
                 'ObjectId':objid,
                 'ActionName':'Chat',
                 'StatusId':dafStatus}
