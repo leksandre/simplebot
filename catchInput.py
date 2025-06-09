@@ -36,6 +36,15 @@ dafStatus = 34
 tenant = 'domotel'
 domen = 'https://'+tenant+'-admin.mobsted.ru'
 
+errorRegistration = '''ваш аккаунт не зарегиcтрирован в нашей системе, напишите сюда, пожалуйста, следующие данные:
+- номер вашй машины в формате а123ааХХ
+- номер вашей карты мойки (написан на карте Пит Стоп)
+- ваш номер мобильного телефона
+- ваше имя
+- ваш email 
+
+или пройдите регистрацию у нашего менеджера в оффисе по адресу г. Тюмень, ул. Хохрякова 44, оффис ДомОтель'''
+
 def selByPhoneFromBase(name):
     limit = 1
     try:
@@ -487,7 +496,9 @@ def main():
                             bot.send_message(chat_id, "добро пожаловать в систему для получения бонусов Дом Отель, "+str(fio[0]))
                         else:
                             #отказать    
-                            bot.send_message(chat_id, "ваш аккаунт не зарегиcтрирован в нашей системе, получите регистрационный код у нашего менеджера")
+                            bot.send_message(chat_id, errorRegistration)
+                            for chat in service_chats_id: 
+                                bot.send_message(chat, "--> !!!незарегистрированный пользователь ("+text_message+") написал '"+text_message+"'" )
                             continue
 
                 if not fio:
