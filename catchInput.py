@@ -43,6 +43,9 @@ errorRegistration = '''ваш аккаунт не зарегиcтрирован 
 - ваше имя
 - ваш email 
 
+и подождите после этого пару  часов для регистрации
+
+
 или пройдите регистрацию у нашего менеджера в оффисе по адресу г. Тюмень, ул. Хохрякова 44, оффис ДомОтель'''
 
 def selByPhoneFromBase(name):
@@ -494,15 +497,16 @@ def main():
                         fio = selByPinFromBase(text_message,chat_id)
                         if fio:
                             bot.send_message(chat_id, "добро пожаловать в систему для получения бонусов Дом Отель, "+str(fio[0]))
-                        else:
-                            #отказать    
-                            bot.send_message(chat_id, errorRegistration)
-                            for chat in service_chats_id: 
-                                bot.send_message(chat, "--> !!!незарегистрированный пользователь ("+text_message+") написал '"+text_message+"'" )
-                            continue
 
                 if not fio:
-                   print('!!!!!!!!!!!!-------------------- bad thing for chat:',chat_id)
+                    print('!!!!!!!!!!!!-------------------- bad thing for chat:',chat_id)
+                       
+                    #отказать    
+                    bot.send_message(chat_id, errorRegistration)
+                    for chat in service_chats_id: 
+                        user11 = msg.from_user
+                        bot.send_message(chat, "--> !!!незарегистрированный пользователь ("+str(chat_id)+") ("+str(user11)+") написал '"+text_message+"'" )
+                        
                    continue 
                
                 
