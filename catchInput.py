@@ -507,7 +507,7 @@ def main():
                         user11 = msg.from_user
                         bot.send_message(chat, "--> !!!незарегистрированный пользователь ("+str(chat_id)+") ("+str(user11)+") написал '"+text_message+"'" )
                         
-                   continue 
+                    continue 
                
                 
                 ObjectId = selByChatIdFromBase(chat_id, 'id')
